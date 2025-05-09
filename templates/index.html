@@ -57,7 +57,9 @@
                         <th>Название</th>
                         <th>Бюджет (₽)</th>
                         <th>Даты</th>
-                        <th>Целевая аудитория</th>
+                        <th>Пол</th>
+                        <th>Возраст</th>
+                        <th>Доход</th>
                         <th>Цикл кампании</th>
                         <th>Платформы</th>
                         <th>Редактировать</th>
@@ -71,7 +73,9 @@
                         <td>{{ plan.name }}</td>
                         <td>{{ plan.budget }}</td>
                         <td>{{ plan.start_date }} - {{ plan.end_date }}</td>
-                        <td>{{ plan.target_audience }}</td>
+                        <td>{{ plan.gender }}</td>
+                        <td>{{ plan.age_groups }}</td>
+                        <td>{{ plan.income_level }}</td>
                         <td>{{ plan.campaign_cycle }}</td>
                         <td>
                             <ul class="list-unstyled mb-0">
@@ -81,7 +85,11 @@
                             </ul>
                         </td>
                         <td><a href="{{ url_for('edit_plan', plan_id=plan.id) }}" class="btn btn-warning btn-sm">Редактировать</a></td>
-                        <td><a href="{{ url_for('delete_plan', plan_id=plan.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены?')">Удалить</a></td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_plan', plan_id=plan.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены?')">Удалить</button>
+                            </form>
+                        </td>
                     </tr>
                     {% endif %}
                     {% endfor %}

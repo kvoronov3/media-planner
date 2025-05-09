@@ -22,9 +22,11 @@ class MediaPlan(db.Model):
     budget = db.Column(db.Float, nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
-    target_audience = db.Column(db.String(200))
+    gender = db.Column(db.String(20), nullable=False)  # "Мужчины", "Женщины", "Оба пола"
+    age_groups = db.Column(db.String(200), nullable=False)  # Например, "До 18,18-25"
+    income_level = db.Column(db.String(20), nullable=False)  # "Низкий", "Средний", "Высокий"
     campaign_cycle = db.Column(db.String(50))
-    platforms = db.relationship('MediaPlanPlatform', backref='media_plan', lazy=True)
+    platforms = db.relationship('MediaPlanPlatform', backref='media_plan', lazy=True, cascade='all, delete-orphan')
 
 class MediaPlanPlatform(db.Model):
     __tablename__ = 'media_plan_platforms'

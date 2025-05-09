@@ -67,7 +67,9 @@
                         <div class="card-body plan-details">
                             <p><strong>Бюджет:</strong> {{ plan.budget }} ₽</p>
                             <p><strong>Даты:</strong> {{ plan.start_date }} - {{ plan.end_date }}</p>
-                            <p><strong>Целевая аудитория:</strong> {{ plan.target_audience }}</p>
+                            <p><strong>Пол:</strong> {{ plan.gender }}</p>
+                            <p><strong>Возраст:</strong> {{ plan.age_groups }}</p>
+                            <p><strong>Доход:</strong> {{ plan.income_level }}</p>
                             <p><strong>Цикл кампании:</strong> {{ plan.campaign_cycle }}</p>
                             <h6>Платформы:</h6>
                             <ul class="list-group list-group-flush">
@@ -76,7 +78,7 @@
                                     <strong>{{ platform.platform.name }}:</strong> {{ platform.budget }} ₽<br>
                                     Показы: {{ platform.impressions }}<br>
                                     Клики: {{ platform.clicks }}<br>
-                                    CTR: {{ "%.2f"|format(platform.ctr) }}% <span class="text-muted" data-bs-toggle="tooltip" title="CTR (Click-Through Rate) — процент кликов от показов">ℹ️</span><br>
+                                    CTR: {{ "%.2f"|format((platform.clicks / platform.impressions * 100) if platform.impressions > 0 else 0) }}% <span class="text-muted" data-bs-toggle="tooltip" title="CTR (Click-Through Rate) — процент кликов от показов">ℹ️</span><br>
                                     CPC: {{ "%.2f"|format(platform.cpc) }} ₽ <span class="text-muted" data-bs-toggle="tooltip" title="CPC (Cost Per Click) — стоимость одного клика">ℹ️</span><br>
                                     CPM: {{ "%.2f"|format(platform.cpm) }} ₽ <span class="text-muted" data-bs-toggle="tooltip" title="CPM (Cost Per Mille) — стоимость за 1000 показов">ℹ️</span>
                                 </li>
@@ -101,7 +103,7 @@
                                         labels: [{% for platform in plan.platforms %}'{{ platform.platform.name }}',{% endfor %}],
                                         datasets: [{
                                             label: 'CTR (%)',
-                                            data: [{% for platform in plan.platforms %}{{ platform.ctr }},{% endfor %}],
+                                            data: [{% for platform in plan.platforms %}{{ (platform.clicks / platform.impressions * 100) if platform.impressions > 0 else 0 }},{% endfor %}],
                                             backgroundColor: '#E63946'
                                         }]
                                     },
@@ -126,19 +128,33 @@
                                                 label: 'Показы',
                                                 data: [{% for platform in plan.platforms %}{{ platform.impressions / 5 }},{% endfor %}],
                                                 borderColor: '#E63946',
-                                                fill: false
+                                                fill: false,
+                                                yAxisID: 'y-left'
                                             },
                                             {
                                                 label: 'Клики',
                                                 data: [{% for platform in plan.platforms %}{{ platform.clicks / 5 }},{% endfor %}],
                                                 borderColor: '#FFCE56',
-                                                fill: false
+                                                fill: false,
+                                                yAxisID: 'y-right'
                                             }
                                         ]
                                     },
                                     options: {
                                         scales: {
-                                            y: { beginAtZero: true, title: { display: true, text: 'Значения' } },
+                                            'y-left': {
+                                                type: 'linear',
+                                                position: 'left',
+                                                title: { display: true, text: 'Показы' },
+                                                beginAtZero: true
+                                            },
+                                            'y-right': {
+                                                type: 'linear',
+                                                position: 'right',
+                                                title: { display: true, text: 'Клики' },
+                                                beginAtZero: true,
+                                                grid: { drawOnChartArea: false }
+                                            },
                                             x: { title: { display: true, text: 'Дни' } }
                                         },
                                         plugins: { title: { display: true, text: 'Динамика показов и кликов' } }

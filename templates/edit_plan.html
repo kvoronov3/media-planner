@@ -57,8 +57,29 @@
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label for="target_audience" class="form-label">Целевая аудитория <span class="text-muted" data-bs-toggle="tooltip" title="Например, '18-25, женщины, интересующиеся модой'">ℹ️</span></label>
-                    <input type="text" class="form-control" name="target_audience" id="target_audience" value="{{ plan.target_audience }}" placeholder="Например, 18-25">
+                    <label for="gender" class="form-label">Пол <span class="text-muted" data-bs-toggle="tooltip" title="Выберите пол целевой аудитории">ℹ️</span></label>
+                    <select name="gender" id="gender" class="form-control" required>
+                        {% for gender in genders %}
+                        <option value="{{ gender }}" {% if gender == plan.gender %}selected{% endif %}>{{ gender }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Возрастные группы <span class="text-muted" data-bs-toggle="tooltip" title="Выберите одну или несколько возрастных групп">ℹ️</span></label>
+                    {% for age_group in age_groups_options %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="age_groups" id="age_{{ age_group }}" value="{{ age_group }}" {% if age_group in plan.age_groups.split(',') %}checked{% endif %}>
+                        <label class="form-check-label" for="age_{{ age_group }}">{{ age_group }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    <label for="income_level" class="form-label">Уровень дохода <span class="text-muted" data-bs-toggle="tooltip" title="Выберите уровень дохода аудитории">ℹ️</span></label>
+                    <select name="income_level" id="income_level" class="form-control" required>
+                        {% for level in income_levels %}
+                        <option value="{{ level }}" {% if level == plan.income_level %}selected{% endif %}>{{ level }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label for="campaign_cycle" class="form-label">Цикл кампании <span class="text-muted" data-bs-toggle="tooltip" title="Выберите стадию кампании: Рост, Зрелость, Спад или Запуск">ℹ️</span></label>

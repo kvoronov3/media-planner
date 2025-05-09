@@ -8,6 +8,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import csv
 from io import StringIO, BytesIO
+import random
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 sys.stdout.reconfigure(encoding='utf-8')
@@ -58,17 +59,22 @@ def edit_plan(plan_id):
         return redirect(url_for('index'))
     platforms = Platform.query.all()
     campaign_cycles = ['Рост', 'Зрелость', 'Спад', 'Запуск']
+    genders = ['Мужчины', 'Женщины', 'Оба пола']
+    age_groups_options = ['До 18', '18-25', '25-35', '35-45', '45+']
+    income_levels = ['Низкий', 'Средний', 'Высокий']
     if request.method == 'POST':
         plan.name = request.form['name']
         plan.budget = float(request.form['budget'])
         plan.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         plan.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        plan.target_audience = request.form['target_audience']
+        plan.gender = request.form['gender']
+        plan.age_groups = ','.join(request.form.getlist('age_groups'))
+        plan.income_level = request.form['income_level']
         plan.campaign_cycle = request.form['campaign_cycle']
         db.session.commit()
         flash('Медиаплан успешно обновлен!')
         return redirect(url_for('index'))
-    return render_template('edit_plan.html', plan=plan, platforms=platforms, campaign_cycles=campaign_cycles)
+    return render_template('edit_plan.html', plan=plan, platforms=platforms, campaign_cycles=campaign_cycles, genders=genders, age_groups_options=age_groups_options, income_levels=income_levels)
 
 @app.route('/delete_plan/<int:plan_id>', methods=['POST'])
 @login_required
@@ -87,109 +93,189 @@ def delete_plan(plan_id):
 def create_plan_traditional():
     platforms = Platform.query.all()
     campaign_cycles = ['Рост', 'Зрелость', 'Спад', 'Запуск']
+    genders = ['Мужчины', 'Женщины', 'Оба пола']
+    age_groups_options = ['До 18', '18-25', '25-35', '35-45', '45+']
+    income_levels = ['Низкий', 'Средний', 'Высокий']
     if request.method == 'POST':
         name = request.form['name']
         budget = float(request.form['budget'])
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        target_audience = request.form['target_audience']
+        gender = request.form['gender']
+        age_groups = ','.join(request.form.getlist('age_groups'))
+        income_level = request.form['income_level']
         campaign_cycle = request.form['campaign_cycle']
+
+        if not age_groups:
+            flash('Выберите хотя бы одну возрастную группу')
+            return redirect(url_for('create_plan_traditional'))
 
         if budget <= 0:
             flash('Бюджет должен быть больше 0')
             return redirect(url_for('create_plan_traditional'))
 
-        new_plan = MediaPlan(
-            user_id=current_user.id,
-            name=name,
-            budget=budget,
-            start_date=start_date,
-            end_date=end_date,
-            target_audience=target_audience,
-            campaign_cycle=campaign_cycle
-        )
-        db.session.add(new_plan)
-        db.session.commit()
+        for age_group in age_groups.split(','):
+            new_plan = MediaPlan(
+                user_id=current_user.id,
+                name=f"{name} ({age_group})",
+                budget=budget,
+                start_date=start_date,
+                end_date=end_date,
+                gender=gender,
+                age_groups=age_group,
+                income_level=income_level,
+                campaign_cycle=campaign_cycle
+            )
+            db.session.add(new_plan)
+            db.session.flush()
 
-        total_platform_budget = 0
-        for platform in platforms:
-            platform_id = platform.id
-            platform_budget = float(request.form[f'platform_budget_{platform_id}'])
-            if platform_budget > 0:
-                total_platform_budget += platform_budget
-                media_plan_platform = MediaPlanPlatform(
-                    media_plan_id=new_plan.id,
-                    platform_id=platform_id,
-                    budget=platform_budget
-                )
-                db.session.add(media_plan_platform)
-        db.session.commit()
+            total_platform_budget = 0
+            for platform in platforms:
+                platform_id = platform.id
+                platform_budget = float(request.form.get(f'platform_budget_{platform_id}', 0))
+                if platform_budget > 0:
+                    total_platform_budget += platform_budget
+                    impressions = int((platform_budget / 500) * 1000)
+                    clicks = int(impressions * (platform.average_ctr / 100) * random.uniform(0.9, 1.1))
+                    if end_date < datetime.now().date():
+                        new_platform = MediaPlanPlatform(
+                            media_plan_id=new_plan.id,
+                            platform_id=platform_id,
+                            budget=platform_budget,
+                            impressions=impressions,
+                            clicks=clicks
+                        )
+                    else:
+                        new_platform = MediaPlanPlatform(
+                            media_plan_id=new_plan.id,
+                            platform_id=platform_id,
+                            budget=platform_budget
+                        )
+                    db.session.add(new_platform)
 
-        if total_platform_budget != budget:
-            flash('Сумма бюджетов по платформам должна совпадать с общим бюджетом')
-            db.session.delete(new_plan)
+            if abs(total_platform_budget - budget) > 0.01:
+                db.session.rollback()
+                flash('Сумма бюджетов по платформам должна совпадать с общим бюджетом')
+                return redirect(url_for('create_plan_traditional'))
+
             db.session.commit()
-            return redirect(url_for('create_plan_traditional'))
 
-        flash('Медиаплан успешно создан!')
+        flash('Медиапланы успешно созданы!')
         return redirect(url_for('index'))
-    return render_template('create_plan_traditional.html', platforms=platforms, campaign_cycles=campaign_cycles)
+    return render_template('create_plan_traditional.html', platforms=platforms, campaign_cycles=campaign_cycles, genders=genders, age_groups_options=age_groups_options, income_levels=income_levels)
 
 @app.route('/create_plan_innovative', methods=['GET', 'POST'])
 @login_required
 def create_plan_innovative():
     platforms = Platform.query.all()
     campaign_cycles = ['Рост', 'Зрелость', 'Спад', 'Запуск']
+    genders = ['Мужчины', 'Женщины', 'Оба пола']
+    age_groups_options = ['До 18', '18-25', '25-35', '35-45', '45+']
+    income_levels = ['Низкий', 'Средний', 'Высокий']
     if request.method == 'POST':
         name = request.form['name']
         budget = float(request.form['budget'])
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        target_audience = request.form['target_audience']
+        gender = request.form['gender']
+        age_groups = request.form.getlist('age_groups')
+        income_level = request.form['income_level']
         campaign_cycle = request.form['campaign_cycle']
+
+        if not age_groups:
+            flash('Выберите хотя бы одну возрастную группу')
+            return redirect(url_for('create_plan_innovative'))
 
         if budget <= 0:
             flash('Бюджет должен быть больше 0')
             return redirect(url_for('create_plan_innovative'))
 
-        new_plan = MediaPlan(
-            user_id=current_user.id,
-            name=name,
-            budget=budget,
-            start_date=start_date,
-            end_date=end_date,
-            target_audience=target_audience,
-            campaign_cycle=campaign_cycle
-        )
-        db.session.add(new_plan)
-        db.session.commit()
-
-        total_platform_budget = 0
-        cycle_weights = {
-            'Рост': {'Facebook': 0.4, 'Instagram': 0.3, 'YouTube': 0.2, 'Telegram': 0.1},
-            'Зрелость': {'Facebook': 0.25, 'Instagram': 0.25, 'YouTube': 0.25, 'Telegram': 0.25},
-            'Спад': {'Facebook': 0.2, 'Instagram': 0.2, 'YouTube': 0.2, 'Telegram': 0.4},
-            'Запуск': {'Facebook': 0.5, 'Instagram': 0.3, 'YouTube': 0.15, 'Telegram': 0.05}
+        age_weights = {
+            'До 18': {'TikTok': 0.50, 'YouTube': 0.30, 'Instagram': 0.20, 'ВКонтакте': 0.0, 'Яндекс.Директ': 0.0},
+            '18-25': {'YouTube': 0.40, 'Instagram': 0.40, 'TikTok': 0.20, 'ВКонтакте': 0.0, 'Яндекс.Директ': 0.0},
+            '25-35': {'Instagram': 0.50, 'ВКонтакте': 0.30, 'Яндекс.Директ': 0.20, 'YouTube': 0.0, 'TikTok': 0.0},
+            '35-45': {'ВКонтакте': 0.40, 'Instagram': 0.30, 'YouTube': 0.20, 'Яндекс.Директ': 0.10, 'TikTok': 0.0},
+            '45+': {'ВКонтакте': 0.50, 'YouTube': 0.30, 'Instagram': 0.20, 'Яндекс.Директ': 0.0, 'TikTok': 0.0}
         }
-        weights = cycle_weights.get(campaign_cycle, {'Facebook': 0.25, 'Instagram': 0.25, 'YouTube': 0.25, 'Telegram': 0.25})
-        
-        for platform in platforms:
-            platform_id = platform.id
-            platform_weight = weights.get(platform.name, 0.25)
-            platform_budget = budget * platform_weight
-            if platform_budget > 0:
-                total_platform_budget += platform_budget
-                media_plan_platform = MediaPlanPlatform(
-                    media_plan_id=new_plan.id,
-                    platform_id=platform_id,
-                    budget=platform_budget
-                )
-                db.session.add(media_plan_platform)
-        db.session.commit()
 
-        flash('Медиаплан успешно создан с учётом инновационного подхода!')
+        for age_group in age_groups:
+            weights = age_weights.get(age_group, {'Яндекс.Директ': 0.2, 'ВКонтакте': 0.2, 'YouTube': 0.2, 'Instagram': 0.2, 'TikTok': 0.2})
+
+            if gender == 'Мужчины':
+                if 'Яндекс.Директ' in weights:
+                    weights['Яндекс.Директ'] += 0.10
+                    for platform in weights:
+                        if platform != 'Яндекс.Директ' and weights[platform] > 0:
+                            weights[platform] -= 0.10 / (len(weights) - 1)
+            elif gender == 'Женщины':
+                if 'Instagram' in weights:
+                    weights['Instagram'] += 0.10
+                    for platform in weights:
+                        if platform != 'Instagram' and weights[platform] > 0:
+                            weights[platform] -= 0.10 / (len(weights) - 1)
+
+            if income_level == 'Низкий':
+                if 'ВКонтакте' in weights:
+                    weights['ВКонтакте'] += 0.10
+                    for platform in weights:
+                        if platform != 'ВКонтакте' and weights[platform] > 0:
+                            weights[platform] -= 0.10 / (len(weights) - 1)
+            elif income_level == 'Высокий':
+                if 'Яндекс.Директ' in weights:
+                    weights['Яндекс.Директ'] += 0.10
+                    for platform in weights:
+                        if platform != 'Яндекс.Директ' and weights[platform] > 0:
+                            weights[platform] -= 0.10 / (len(weights) - 1)
+
+            new_plan = MediaPlan(
+                user_id=current_user.id,
+                name=f"{name} ({age_group})",
+                budget=budget,
+                start_date=start_date,
+                end_date=end_date,
+                gender=gender,
+                age_groups=age_group,
+                income_level=income_level,
+                campaign_cycle=campaign_cycle
+            )
+            db.session.add(new_plan)
+            db.session.flush()
+
+            total_platform_budget = 0
+            for platform in platforms:
+                platform_id = platform.id
+                platform_weight = weights.get(platform.name, 0.0)
+                platform_budget = budget * platform_weight
+                if platform_budget > 0:
+                    total_platform_budget += platform_budget
+                    impressions = int((platform_budget / 500) * 1000)
+                    clicks = int(impressions * (platform.average_ctr / 100) * random.uniform(0.9, 1.1))
+                    if end_date < datetime.now().date():
+                        new_platform = MediaPlanPlatform(
+                            media_plan_id=new_plan.id,
+                            platform_id=platform_id,
+                            budget=platform_budget,
+                            impressions=impressions,
+                            clicks=clicks
+                        )
+                    else:
+                        new_platform = MediaPlanPlatform(
+                            media_plan_id=new_plan.id,
+                            platform_id=platform_id,
+                            budget=platform_budget
+                        )
+                    db.session.add(new_platform)
+
+            if abs(total_platform_budget - budget) > 0.01:
+                db.session.rollback()
+                flash('Сумма бюджетов по платформам должна совпадать с общим бюджетом')
+                return redirect(url_for('create_plan_innovative'))
+
+            db.session.commit()
+
+        flash('Медиапланы успешно созданы с учётом инновационного подхода!')
         return redirect(url_for('index'))
-    return render_template('create_plan_innovative.html', platforms=platforms, campaign_cycles=campaign_cycles)
+    return render_template('create_plan_innovative.html', platforms=platforms, campaign_cycles=campaign_cycles, genders=genders, age_groups_options=age_groups_options, income_levels=income_levels)
 
 @app.route('/suggest-budget', methods=['POST'])
 @login_required
@@ -227,6 +313,7 @@ def analysis():
 
     selected_plans = []
     compare_data = None
+    recommendations = []
 
     if request.method == 'POST':
         selected_plan_ids = request.form.getlist('plans')
@@ -236,41 +323,47 @@ def analysis():
         compare_data = []
         for plan in selected_plans:
             plan_data = {
+                'id': plan.id,  # Добавляем id для рекомендаций
                 'name': plan.name,
                 'budget': plan.budget,
                 'ctr': 0,
                 'platforms': []
             }
-            total_impressions = 0
-            total_clicks = 0
+            total_impressions = sum(p.impressions or 0 for p in plan.platforms)
+            total_clicks = sum(p.clicks or 0 for p in plan.platforms)
+            avg_ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+            plan_data['ctr'] = avg_ctr
             for platform in plan.platforms:
-                impressions = platform.impressions if platform.impressions is not None else 0
-                clicks = platform.clicks if platform.clicks is not None else 0
-                total_impressions += impressions
-                total_clicks += clicks
                 platform_data = {
                     'name': platform.platform.name,
-                    'ctr': (clicks / impressions * 100) if impressions > 0 else 0
+                    'ctr': ((platform.clicks or 0) / (platform.impressions or 1) * 100) if (platform.impressions or 0) > 0 else 0
                 }
                 plan_data['platforms'].append(platform_data)
-            plan_data['ctr'] = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
             compare_data.append(plan_data)
 
-    recommendations = []
+        # Генерация рекомендаций
+        if len(compare_data) > 1:
+            max_ctr_plan = max(compare_data, key=lambda x: x['ctr'])
+            min_budget_plan = min(compare_data, key=lambda x: x['budget'])
+            if max_ctr_plan['ctr'] > min(compare_data, key=lambda x: x['ctr'])['ctr'] + 1:
+                recommendations.append(f"Медиаплан '{max_ctr_plan['name']}' имеет CTR {max_ctr_plan['ctr']:.2f}%, что выше на более чем 1%. Изучите его настройки для применения в других кампаниях.")
+            if min_budget_plan['budget'] < max(compare_data, key=lambda x: x['budget'])['budget'] * 0.5 and max_ctr_plan['id'] == min_budget_plan['id']:
+                recommendations.append(f"Медиаплан '{min_budget_plan['name']}' с бюджетом {min_budget_plan['budget']} ₽ показал высокий CTR. Рассмотрите увеличение бюджета на {max(compare_data, key=lambda x: x['budget'])['budget'] - min_budget_plan['budget']:.2f} ₽.")
+
     for plan in plans:
         for platform in plan.platforms:
-            platform.clicks = platform.clicks if platform.clicks is not None else 0
             platform.impressions = platform.impressions if platform.impressions is not None else 0
+            platform.clicks = platform.clicks if platform.clicks is not None else 0
             platform.forecasted_impressions = int((platform.budget / 500) * 1000)
             platform.forecasted_clicks = int(platform.forecasted_impressions * (platform.platform.average_ctr / 100))
             platform.ctr = (platform.clicks / platform.impressions * 100) if platform.impressions > 0 else 0
             platform.cpc = platform.budget / platform.clicks if platform.clicks > 0 else 0
             platform.cpm = (platform.budget / (platform.impressions / 1000)) if platform.impressions > 0 else 0
 
-            if platform.ctr > 5:
-                recommendations.append(f"Увеличьте бюджет на {platform.platform.name} в медиаплане {plan.name}, так как CTR ({platform.ctr:.2f}%) выше среднего.")
+            if platform.ctr > 5 and platform.budget < max(p.budget for p in plan.platforms) * 0.8:
+                recommendations.append(f"Увеличьте бюджет на {platform.platform.name} в медиаплане {plan.name} (текущий: {platform.budget} ₽), так как CTR ({platform.ctr:.2f}%) выше среднего.")
             if platform.cpm > 1000:
-                recommendations.append(f"Снизьте бюджет на {platform.platform.name} в медиаплане {plan.name}, так как CPM ({platform.cpm:.2f} ₽) слишком высокий.")
+                recommendations.append(f"Снизьте бюджет на {platform.platform.name} в медиаплане {plan.name} (текущий: {platform.budget} ₽), так как CPM ({platform.cpm:.2f} ₽) слишком высокий.")
 
     return render_template('analysis.html', plans=plans, selected_plans=selected_plans, compare_data=compare_data, plans_paginated=plans_paginated, recommendations=recommendations)
 
@@ -316,7 +409,9 @@ def reports():
                     'budget': plan.budget,
                     'start_date': plan.start_date.strftime('%Y-%m-%d'),
                     'end_date': plan.end_date.strftime('%Y-%m-%d'),
-                    'target_audience': plan.target_audience,
+                    'gender': plan.gender,
+                    'age_groups': plan.age_groups,
+                    'income_level': plan.income_level,
                     'campaign_cycle': plan.campaign_cycle,
                     'platforms': [
                         {
@@ -349,7 +444,11 @@ def reports():
             y -= 20
             c.drawString(100, y, f"Даты: {plan.start_date} - {plan.end_date}")
             y -= 20
-            c.drawString(100, y, f"Целевая аудитория: {plan.target_audience}")
+            c.drawString(100, y, f"Пол: {plan.gender}")
+            y -= 20
+            c.drawString(100, y, f"Возраст: {plan.age_groups}")
+            y -= 20
+            c.drawString(100, y, f"Доход: {plan.income_level}")
             y -= 20
             c.drawString(100, y, f"Цикл кампании: {plan.campaign_cycle}")
             y -= 20
@@ -375,18 +474,16 @@ def reports():
 @login_required
 def export_plans():
     plans = MediaPlan.query.filter_by(user_id=current_user.id).all()
-    # Сначала создаем CSV в текстовом формате с помощью StringIO
     output = StringIO()
-    writer = csv.writer(output, lineterminator='\n')  # Используем lineterminator для корректных переносов строк
-    writer.writerow(['ID', 'Название', 'Бюджет', 'Дата начала', 'Дата окончания', 'Целевая аудитория', 'Цикл кампании', 'Платформы'])
+    writer = csv.writer(output, lineterminator='\n')
+    writer.writerow(['ID', 'Название', 'Бюджет', 'Дата начала', 'Дата окончания', 'Пол', 'Возраст', 'Доход', 'Цикл кампании', 'Платформы'])
     for plan in plans:
         platforms_info = "; ".join([f"{p.platform.name}: {p.budget} ₽, Показы: {p.impressions}, Клики: {p.clicks}" for p in plan.platforms])
-        writer.writerow([plan.id, plan.name, plan.budget, plan.start_date, plan.end_date, plan.target_audience, plan.campaign_cycle, platforms_info])
+        writer.writerow([plan.id, plan.name, plan.budget, plan.start_date, plan.end_date, plan.gender, plan.age_groups, plan.income_level, plan.campaign_cycle, platforms_info])
     
-    # Преобразуем содержимое StringIO в BytesIO с кодировкой UTF-8
     output.seek(0)
     bytes_output = BytesIO(output.getvalue().encode('utf-8'))
-    output.close()  # Закрываем StringIO
+    output.close()
 
     return send_file(
         bytes_output,
@@ -402,4 +499,6 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
