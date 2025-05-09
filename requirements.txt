@@ -29,7 +29,7 @@ Pyrogram==2.0.106
 PySocks==1.7.1
 python-dotenv==1.0.0
 PyYAML==6.0.2
-reportlab==3.6.12
+reportlab==4.0.4
 rich==13.9.4
 rsa==4.9
 schedule==1.2.2
