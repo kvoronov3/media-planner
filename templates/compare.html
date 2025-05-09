@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сравнение медиапланов</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}">Главная</a>
+            <a href="{{ url_for('create_plan') }}">Создать медиаплан</a>
+            <a href="{{ url_for('analysis') }}">Анализ</a>
+            <a href="{{ url_for('compare') }}">Сравнение</a>
+            <a href="{{ url_for('reports') }}">Отчеты</a>
+            <a href="{{ url_for('logout') }}" class="logout">Выйти</a>
+        </div>
+    </nav>
+    <div class="container">
+        <h1>Сравнение медиапланов</h1>
+        <form method="POST" class="compare-form">
+            <label>Выберите медиапланы для сравнения:</label>
+            <select name="plans" multiple required>
+                {% for plan in plans %}
+                <option value="{{ plan.id }}">{{ plan.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Сравнить</button>
+        </form>
+        {% if plans|length > 0 %}
+        <h2>Сравнение:</h2>
+        <div class="compare-grid">
+            {% for plan in plans %}
+            <div class="compare-card">
+                <h3>{{ plan.name }}</h3>
+                <p><strong>Бюджет:</strong> {{ plan.budget }} ₽</p>
+                <p><strong>Даты:</strong> {{ plan.start_date }} - {{ plan.end_date }}</p>
+                <p><strong>Целевая аудитория:</strong> {{ plan.target_audience }}</p>
+                <h4>Платформы:</h4>
+                <ul>
+                    {% for platform in plan.platforms %}
+                    <li>{{ platform.platform.name }}: CTR {{ "%.2f"|format(platform.ctr) }}%</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+        <canvas id="compareCtrChart" width="600" height="300"></canvas>
+        <script>
+            var ctx = document.getElementById('compareCtrChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [{% for plan in plans %}'{{ plan.name }}',{% endfor %}],
+                    datasets: [
+                        {% for platform_name in ['Facebook', 'YouTube', 'Instagram', 'Telegram'] %}
+                        {
+                            label: '{{ platform_name }}',
+                            data: [{% for plan in plans %}
+                                {% set ctr = 0 %}
+                                {% for platform in plan.platforms %}
+                                    {% if platform.platform.name == platform_name %}
+                                        {% set ctr = platform.ctr %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ ctr }},
+                            {% endfor %}],
+                            backgroundColor: '{{ '#E63946' if platform_name == 'Facebook' else '#36A2EB' if platform_name == 'YouTube' else '#4BC0C0' if platform_name == 'Instagram' else '#FFCE56' }}'
+                        },
+                        {% endfor %}
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'CTR (%)' } }
+                    },
+                    plugins: {
+                        title: { display: true, text: 'Сравнение CTR по медиапланам' }
+                    }
+                }
+            });
+        </script>
+        {% endif %}
+    </div>
+</body>
+</html>

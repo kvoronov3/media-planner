@@ -1,0 +1,83 @@
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #F5F7FA;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    color: #E63946 !important;
+}
+
+.navbar-nav .nav-link {
+    color: #333;
+}
+
+.navbar-nav .nav-link:hover {
+    color: #E63946;
+}
+
+.card {
+    border-radius: 10px;
+    background-color: #FFFFFF;
+}
+
+.card-header {
+    background-color: #F9FAFB;
+    cursor: pointer;
+}
+
+.toggle-icon {
+    font-size: 1.2rem;
+    color: #E63946;
+}
+
+.plan-details {
+    display: none;
+}
+
+.list-group-item {
+    border: none;
+}
+
+canvas {
+    max-width: 100%;
+    margin-top: 20px;
+}
+
+.alert {
+    margin-bottom: 20px;
+}
+
+.table-dark {
+    background-color: #343a40;
+}
+
+.btn-primary {
+    background-color: #E63946;
+    border-color: #E63946;
+}
+
+.btn-primary:hover {
+    background-color: #D62828;
+    border-color: #D62828;
+}
+
+.btn-outline-primary {
+    color: #E63946;
+    border-color: #E63946;
+}
+
+.btn-outline-primary:hover {
+    background-color: #E63946;
+    color: #FFFFFF;
+}
+
+.text-primary {
+    color: #E63946 !important;
+}
+
+@media (max-width: 768px) {
+    .navbar-nav {
+        text-align: center;
+    }
+}
